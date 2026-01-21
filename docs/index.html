@@ -1,189 +1,536 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Password Generator</title>
-<style>
-  body {font-family:Arial,sans-serif;max-width:700px;margin:2rem auto;}
-  .section{margin-bottom:1.5rem;}
-  label{display:block;margin-bottom:.5rem;}
-  input[type="number"]{width:60px;}
-  #output{font-family:monospace;background:#f4f4f4;padding:.5rem;border:1px solid #ccc;}
-  button{margin-right:.5rem;}
-  .strength{font-weight:bold;}
-  table{width:100%;border-collapse:collapse;margin-top:.5rem;}
-  th,td{border:1px solid #ddd;padding:.5rem;text-align:left;}
-  .delBtn{background:#e74c3c;color:#fff;border:none;padding:.3rem .6rem;cursor:pointer;}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generator – Passwords · Secrets · Keys · RSA</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 820px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.6;
+    }
+    h1, h2 { text-align: center; margin-bottom: 1.4rem; }
+    .section {
+      margin: 2.2rem 0;
+      padding: 1.6rem;
+      background: #f9fafb;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+    }
+    label { display: block; margin: 0.7rem 0; font-weight: 500; }
+    select, input[type="radio"] { margin-right: 0.8rem; }
+    .output {
+      font-family: 'Courier New', Consolas, monospace;
+      background: #f1f5f9;
+      padding: 1.3rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      word-break: break-all;
+      min-height: 4rem;
+      font-size: 1.05rem;
+      white-space: pre-wrap;
+      margin: 1rem 0;
+    }
+    button {
+      padding: 0.8rem 1.6rem;
+      margin: 0.5rem 0.5rem 0.5rem 0;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1.05rem;
+    }
+    .btn-primary  { background: #2563eb; color: white; }
+    .btn-primary:hover  { background: #1d4ed8; }
+    .btn-secondary { background: #64748b; color: white; }
+    .btn-secondary:hover { background: #475569; }
+    .strength { font-weight: 600; }
+    .weak    { color: #ef4444; }
+    .moderate{ color: #f59e0b; }
+    .strong  { color: #10b981; }
+    .verystrong { color: #059669; }
+    .options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.2rem;
+      margin: 1rem 0;
+    }
+    .options label {
+      padding: 0.7rem 1.4rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      cursor: pointer;
+      background: white;
+    }
+    .options input:checked + span {
+      font-weight: bold;
+      background: #e5e7eb;
+    }
+    #error { color: #dc2626; font-weight: 500; margin: 1.2rem 0; display: none; }
+    #phrase-options { display: none; }
+    small { color: #64748b; font-size: 0.95rem; display: block; margin-bottom: 0.8rem; }
+  </style>
 </head>
 <body>
 
-<h2>Password Generator</h2>
+  <h1>Generator – Passwords · Secrets · Keys · RSA</h1>
 
-<div class="section">
-  <label><input type="radio" name="mode" value="words" checked> 3 Random Words</label>
-  <label><input type="radio" name="mode" value="chars"> Pure Random Characters</label>
-</div>
+  <!-- Password / Passphrase -->
+  <div class="section">
+    <h2>Password / Passphrase</h2>
 
-<div class="section" id="char-options" style="display:none;">
-  <label>Length: <input type="number" id="charLength" min="6" value="12"></label>
-</div>
+    <label>Type:</label>
+    <label><input type="radio" name="mode" value="phrase" checked> Passphrase (words)</label>
+    <label><input type="radio" name="mode" value="chars"> Random characters</label>
 
-<div class="section">
-  <button id="generateBtn">Generate</button>
-  <button id="copyBtn" disabled>Copy</button>
-</div>
+    <label style="margin-top:1.2rem">Complexity:</label>
+    <div class="options">
+      <label><input type="radio" name="strength" value="simple" checked><span>Simple</span></label>
+      <label><input type="radio" name="strength" value="good"><span>Good</span></label>
+      <label><input type="radio" name="strength" value="strong"><span>Strong</span></label>
+      <label><input type="radio" name="strength" value="verystrong"><span>Very strong</span></label>
+    </div>
 
-<div class="section">
-  <div id="output"></div>
-  <div>Strength: <span class="strength" id="strength"></span></div>
-</div>
+    <div id="phrase-options">
+      <label style="margin-top:1.2rem">Separator:</label>
+      <div class="options">
+        <label><input type="radio" name="separator" value=" " checked><span>Space</span></label>
+        <label><input type="radio" name="separator" value="-"><span>Hyphen</span></label>
+        <label><input type="radio" name="separator" value="."><span>Dot</span></label>
+        <label><input type="radio" name="separator" value=""><span>CamelCase</span></label>
+      </div>
 
-<hr>
+      <label style="margin-top:1.2rem">Add random digit:</label>
+      <div class="options">
+        <label><input type="radio" name="digit" value="none" checked><span>None</span></label>
+        <label><input type="radio" name="digit" value="begin"><span>Beginning</span></label>
+        <label><input type="radio" name="digit" value="end"><span>End</span></label>
+        <label><input type="radio" name="digit" value="both"><span>Both</span></label>
+      </div>
+    </div>
 
-<h3>Saved Passwords</h3>
-<div class="section">
-  <label>Tag: <input type="text" id="tagInput" placeholder="e.g., Email, Bank"></label>
-  <button id="saveBtn" disabled>Save Locally</button>
-</div>
+    <div style="margin-top:1.6rem">
+      <button id="generatePwdBtn" class="btn-primary">Generate Password</button>
+      <button id="copyPwdBtn" class="btn-secondary" disabled>Copy</button>
+    </div>
 
-<table id="savedTable">
-  <thead>
-    <tr><th>Date</th><th>Tag</th><th>Password</th><th>Action</th></tr>
-  </thead>
-  <tbody></tbody>
-</table>
+    <div class="output" id="pwdOutput">Click Generate Password…</div>
+    <div>Strength: <span class="strength" id="pwdStrength"></span></div>
+  </div>
+
+  <!-- JWT / General Secret -->
+  <div class="section">
+    <h2>JWT / General Secret</h2>
+    <small>Used for signing JWTs, sessions, encryption, etc.</small>
+
+    <label style="margin-top:1.2rem">Length:</label>
+    <select id="jwtLength">
+      <option value="32">32 chars (~192 bits)</option>
+      <option value="48" selected>48 chars (~288 bits – recommended)</option>
+      <option value="64">64 chars (~384 bits)</option>
+      <option value="96">96 chars (~576 bits)</option>
+    </select>
+
+    <div style="margin-top:1.6rem">
+      <button id="generateJwtBtn" class="btn-primary">Generate Secret</button>
+      <button id="copyJwtBtn" class="btn-secondary" disabled>Copy</button>
+    </div>
+
+    <div class="output" id="jwtOutput">Click Generate Secret…</div>
+  </div>
+
+  <!-- API Key / Token -->
+  <div class="section">
+    <h2>API Key / Token</h2>
+
+    <label style="margin-top:1.2rem">Format:</label>
+    <select id="apiKeyFormat">
+      <option value="uuid">UUID v4 (36 chars)</option>
+      <option value="alphanum" selected>Alphanumeric</option>
+      <option value="hex">Hexadecimal</option>
+    </select>
+
+    <label style="margin-top:1.2rem">Length (alphanum & hex):</label>
+    <select id="apiKeyLength">
+      <option value="24">24 chars</option>
+      <option value="32" selected>32 chars</option>
+      <option value="40">40 chars</option>
+      <option value="48">48 chars</option>
+      <option value="64">64 chars</option>
+    </select>
+
+    <div style="margin-top:1.6rem">
+      <button id="generateApiBtn" class="btn-primary">Generate API Key</button>
+      <button id="copyApiBtn" class="btn-secondary" disabled>Copy</button>
+    </div>
+
+    <div class="output" id="apiOutput">Click Generate API Key…</div>
+  </div>
+
+  <!-- HMAC Key -->
+  <div class="section">
+    <h2>HMAC / Signing Key</h2>
+
+    <label style="margin-top:1.2rem">Key length (bytes):</label>
+    <select id="hmacByteLength">
+      <option value="16">16 bytes (128 bit)</option>
+      <option value="24">24 bytes (192 bit)</option>
+      <option value="32" selected>32 bytes (256 bit – recommended)</option>
+      <option value="48">48 bytes</option>
+      <option value="64">64 bytes (512 bit)</option>
+    </select>
+
+    <label style="margin-top:1.2rem">Format:</label>
+    <select id="hmacFormat">
+      <option value="hex" selected>Hex</option>
+      <option value="base64">Base64</option>
+      <option value="base64url">Base64url</option>
+    </select>
+
+    <div style="margin-top:1.6rem">
+      <button id="generateHmacBtn" class="btn-primary">Generate HMAC Key</button>
+      <button id="copyHmacBtn" class="btn-secondary" disabled>Copy</button>
+    </div>
+
+    <div class="output" id="hmacOutput">Click Generate HMAC Key…</div>
+  </div>
+
+  <!-- RSA Key Pair -->
+  <div class="section">
+    <h2>RSA Key Pair</h2>
+    <small>For SSH, JWT (RS256/RS384/RS512), code signing, encryption</small>
+
+    <label style="margin-top:1.2rem">Key size:</label>
+    <select id="rsaKeySize">
+      <option value="2048">2048 bits</option>
+      <option value="3072" selected>3072 bits (recommended)</option>
+      <option value="4096">4096 bits (high security)</option>
+    </select>
+
+    <div style="margin-top:1.6rem">
+      <button id="generateRsaBtn" class="btn-primary">Generate RSA Key Pair</button>
+    </div>
+
+    <div class="output copy-group">
+      <strong>Private Key (PKCS#8 PEM):</strong><br>
+      <div id="rsaPrivateOutput">— not generated yet —</div>
+      <button id="copyRsaPrivateBtn" class="btn-secondary" disabled>Copy Private</button>
+    </div>
+
+    <div class="output copy-group">
+      <strong>Public Key (SPKI PEM):</strong><br>
+      <div id="rsaPublicOutput">— not generated yet —</div>
+      <button id="copyRsaPublicBtn" class="btn-secondary" disabled>Copy Public</button>
+    </div>
+  </div>
+
+  <div id="error"></div>
 
 <script>
-/* ---------- word list (larger sample) ---------- */
-const WORDS = [
-  "apple","river","mountain","sky","forest","cloud","stone","gold","silver",
-  "shadow","light","storm","garden","planet","orbit","candle","bridge","river",
-  "window","mirror","silence","whisper","ember","crystal","tide","breeze"
-];
+// ────────────────────────────────────────────────
+//  State & wordlist (optional)
+// ────────────────────────────────────────────────
+let WORDS = [];
+let wordlistLoaded = false;
 
-/* ---------- secure random helpers ---------- */
+async function loadWordlist() {
+  try {
+    const res = await fetch('words.json');
+    if (!res.ok) throw new Error();
+    WORDS = await res.json();
+    if (Array.isArray(WORDS) && WORDS.length >= 100) wordlistLoaded = true;
+  } catch {
+    // silent fail – passphrase mode will warn user
+  }
+}
+loadWordlist();
+
+// ────────────────────────────────────────────────
+//  Crypto helpers
+// ────────────────────────────────────────────────
 function getSecureRandomInt(max) {
-  const array = new Uint32Array(1);
-  crypto.getRandomValues(array);
-  return array[0] % max;
-}
-function randomChoice(arr){return arr[getSecureRandomInt(arr.length)];}
-function randomChar(){
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{}|;:,.<>?";
-  return chars[getSecureRandomInt(chars.length)];
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  return arr[0] % max;
 }
 
-/* ---------- generation ---------- */
-function generateWords(){return [randomChoice(WORDS),randomChoice(WORDS),randomChoice(WORDS)].join("-");}
-function generateChars(len){let p="";for(let i=0;i<len;i++)p+=randomChar();return p;}
-
-/* ---------- strength estimation (entropy based) ---------- */
-function estimateStrength(pwd){
-  let pool = 0;
-  if(/[a-z]/.test(pwd)) pool += 26;
-  if(/[A-Z]/.test(pwd)) pool += 26;
-  if(/[0-9]/.test(pwd)) pool += 10;
-  if(/[^A-Za-z0-9]/.test(pwd)) pool += 32; // approximate symbol set
-  const bits = Math.log2(pool) * pwd.length;
-  const label = bits < 40 ? "Very Weak"
-            : bits < 60 ? "Weak"
-            : bits < 80 ? "Moderate"
-            : bits < 100 ? "Strong"
-            : "Very Strong";
-  return `${label} (${bits.toFixed(0)} bits)`;
+function randomChoice(arr) {
+  return arr[getSecureRandomInt(arr.length)];
 }
 
-/* ---------- UI handling ---------- */
-const modeRadios = document.getElementsByName('mode');
-const charOptions = document.getElementById('char-options');
-const generateBtn = document.getElementById('generateBtn');
-const copyBtn = document.getElementById('copyBtn');
-const saveBtn = document.getElementById('saveBtn');
-const outputDiv = document.getElementById('output');
-const strengthSpan = document.getElementById('strength');
-const tagInput = document.getElementById('tagInput');
-const tbody = document.querySelector('#savedTable tbody');
+function randomDigit() {
+  return String(getSecureRandomInt(10));
+}
 
-function getMode(){return [...modeRadios].find(r=>r.checked).value;}
-function updateUI(){charOptions.style.display = getMode()==='chars' ? 'block' : 'none';}
-modeRadios.forEach(r=>r.addEventListener('change',updateUI));
+function randomChar() {
+  const pool = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{}|;:,.<>?/~";
+  return pool[getSecureRandomInt(pool.length)];
+}
 
-generateBtn.addEventListener('click',()=>{
-  const pwd = getMode()==='words' ? generateWords()
-                                   : generateChars(parseInt(document.getElementById('charLength').value,10));
-  outputDiv.textContent = pwd;
-  strengthSpan.textContent = estimateStrength(pwd);
-  copyBtn.disabled = false;
-  saveBtn.disabled = false;
+function derToPem(der, label) {
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(der)));
+  let pem = `-----BEGIN ${label}-----\n`;
+  for (let i = 0; i < base64.length; i += 64) {
+    pem += base64.slice(i, i + 64) + "\n";
+  }
+  pem += `-----END ${label}-----`;
+  return pem;
+}
+
+// ────────────────────────────────────────────────
+//  Generators
+// ────────────────────────────────────────────────
+function generatePassword() {
+  const mode = document.querySelector('input[name="mode"]:checked')?.value || 'chars';
+  const strength = document.querySelector('input[name="strength"]:checked')?.value || 'good';
+
+  if (mode === 'phrase') {
+    if (!wordlistLoaded || WORDS.length < 10) {
+      return "Passphrase mode unavailable (wordlist missing) – using random characters instead.";
+    }
+    let count = {simple:4, good:5, strong:6, verystrong:6}[strength] || 5;
+    let capitalize = strength !== 'simple';
+    let sep = document.querySelector('input[name="separator"]:checked')?.value ?? ' ';
+    let digitMode = document.querySelector('input[name="digit"]:checked')?.value ?? 'none';
+
+    let words = Array.from({length: count}, () => randomChoice(WORDS));
+    if (capitalize) words = words.map(w => w.charAt(0).toUpperCase() + w.slice(1));
+
+    let pwd = words.join(sep);
+    const d = randomDigit();
+    if (digitMode === 'begin' || digitMode === 'both') pwd = d + pwd;
+    if (digitMode === 'end'   || digitMode === 'both') pwd += d;
+    return pwd;
+  }
+
+  // chars mode
+  let len = {simple:12, good:16, strong:20, verystrong:24}[strength] || 16;
+  let p = '';
+  for (let i = 0; i < len; i++) p += randomChar();
+  return p;
+}
+
+function estimateStrength(pwd) {
+  if (!pwd) return "—";
+
+  let bits = 0;
+  const hasSep = /[\s-]/.test(pwd);
+  const hasUpper = /[A-Z]/.test(pwd);
+  const hasDigit = /\d/.test(pwd);
+
+  const parts = pwd.split(/[\s-]+/).filter(Boolean);
+  const isPassphrase = hasSep && parts.length >= 3;
+
+  if (isPassphrase && wordlistLoaded) {
+    bits = Math.log2(Math.max(WORDS.length, 2048)) * parts.length;
+    if (hasUpper) bits += 2.5;
+    if (hasDigit) bits += 3.3;
+  } else {
+    let pool = 0;
+    if (/[a-z]/.test(pwd)) pool += 26;
+    if (/[A-Z]/.test(pwd)) pool += 26;
+    if (/[0-9]/.test(pwd)) pool += 10;
+    if (/[^A-Za-z0-9]/.test(pwd)) pool += 32;
+    bits = Math.log2(pool || 1) * pwd.length;
+  }
+
+  let label, cls;
+  if      (bits <  50) { label = "Very weak"; cls = "weak"; }
+  else if (bits <  70) { label = "Weak";      cls = "weak"; }
+  else if (bits <  90) { label = "Good";      cls = "moderate"; }
+  else if (bits < 110) { label = "Strong";    cls = "strong"; }
+  else                 { label = "Very strong"; cls = "verystrong"; }
+
+  return `<span class="${cls}">${label}</span> (~${Math.round(bits)} bits)`;
+}
+
+function generateJwtSecret(length) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  let s = "";
+  for (let i = 0; i < length; i++) s += chars[getSecureRandomInt(chars.length)];
+  return s;
+}
+
+function generateApiKey(format, length) {
+  if (format === "uuid") return crypto.randomUUID();
+
+  const chars = format === "hex"
+    ? "0123456789abcdef"
+    : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+  let key = "";
+  for (let i = 0; i < length; i++) key += chars[getSecureRandomInt(chars.length)];
+  return key;
+}
+
+function generateHmacKey(byteLength, format) {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+
+  if (format === "hex") {
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  let bin = String.fromCharCode(...bytes);
+  const b64 = btoa(bin);
+  return format === "base64" ? b64 : b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+
+async function generateRsaKeyPair(bits = 3072) {
+  const keyPair = await crypto.subtle.generateKey(
+    {
+      name: "RSASSA-PKCS1-v1_5",
+      modulusLength: bits,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: "SHA-256"
+    },
+    true,
+    ["sign", "verify"]
+  );
+
+  const privDer = await crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
+  const privPem = derToPem(privDer, "PRIVATE KEY");
+
+  const pubDer = await crypto.subtle.exportKey("spki", keyPair.publicKey);
+  const pubPem = derToPem(pubDer, "PUBLIC KEY");
+
+  return { privatePem: privPem, publicPem: pubPem };
+}
+
+function derToPem(der, label) {
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(der)));
+  let pem = `-----BEGIN ${label}-----\n`;
+  for (let i = 0; i < base64.length; i += 64) {
+    pem += base64.slice(i, i + 64) + "\n";
+  }
+  pem += `-----END ${label}-----`;
+  return pem;
+}
+
+// ────────────────────────────────────────────────
+//  Copy feedback
+// ────────────────────────────────────────────────
+function flashCopy(btnId) {
+  const btn = document.getElementById(btnId);
+  const orig = btn.textContent;
+  btn.textContent = "Copied!";
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.textContent = orig;
+    btn.disabled = false;
+  }, 1400);
+}
+
+// ────────────────────────────────────────────────
+//  Event listeners – all sections
+// ────────────────────────────────────────────────
+
+// Password / Passphrase
+document.getElementById('generatePwdBtn').addEventListener('click', () => {
+  const pwd = generatePassword();
+  document.getElementById('pwdOutput').textContent = pwd;
+  document.getElementById('pwdStrength').innerHTML = estimateStrength(pwd);
+  document.getElementById('copyPwdBtn').disabled = false;
 });
 
-copyBtn.addEventListener('click',()=>{
-  navigator.clipboard.writeText(outputDiv.textContent).then(()=>{
-    copyBtn.textContent='Copied!';
-    setTimeout(()=>copyBtn.textContent='Copy',1500);
-  });
+document.getElementById('copyPwdBtn').addEventListener('click', async () => {
+  const text = document.getElementById('pwdOutput').textContent.trim();
+  if (text) {
+    await navigator.clipboard.writeText(text);
+    flashCopy('copyPwdBtn');
+  }
 });
 
-/* ---------- safe insertion & delete ---------- */
-function escapeText(text){
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-function addRow(item){
-  const tr = document.createElement('tr');
-
-  const tdDate = document.createElement('td');
-  tdDate.textContent = item.date;
-  const tdTag = document.createElement('td');
-  tdTag.textContent = item.tag;
-  const tdPwd = document.createElement('td');
-  tdPwd.textContent = item.pwd;
-  const tdAct = document.createElement('td');
-  const delBtn = document.createElement('button');
-  delBtn.className = 'delBtn';
-  delBtn.textContent = 'Delete';
-  delBtn.addEventListener('click',()=>{removeEntry(item,tr);});
-  tdAct.appendChild(delBtn);
-
-  tr.append(tdDate, tdTag, tdPwd, tdAct);
-  tbody.appendChild(tr);
-}
-function removeEntry(item,row){
-  try{
-    const saved = JSON.parse(localStorage.getItem('savedPasswords')||'[]');
-    const filtered = saved.filter(i=> !(i.date===item.date && i.tag===item.tag && i.pwd===item.pwd));
-    localStorage.setItem('savedPasswords',JSON.stringify(filtered));
-  }catch(e){console.error(e);}
-  row.remove();
-}
-
-/* ---------- save ---------- */
-saveBtn.addEventListener('click',()=>{
-  const pwd = outputDiv.textContent;
-  const rawTag = tagInput.value.trim() || 'Untitled';
-  const tag = rawTag; // stored as plain text; no HTML allowed
-  const date = new Date().toLocaleString();
-  const entry = {date, tag, pwd};
-
-  addRow(entry);
-  try{
-    const saved = JSON.parse(localStorage.getItem('savedPasswords')||'[]');
-    saved.push(entry);
-    localStorage.setItem('savedPasswords',JSON.stringify(saved));
-  }catch(e){console.error(e);}
-  tagInput.value='';
-  saveBtn.disabled=true;
+// JWT
+document.getElementById('generateJwtBtn').addEventListener('click', () => {
+  const len = parseInt(document.getElementById('jwtLength').value) || 48;
+  const secret = generateJwtSecret(len);
+  document.getElementById('jwtOutput').textContent = secret;
+  document.getElementById('copyJwtBtn').disabled = false;
 });
 
-/* ---------- load on start ---------- */
-window.addEventListener('load',()=>{
-  try{
-    const saved = JSON.parse(localStorage.getItem('savedPasswords')||'[]');
-    saved.forEach(addRow);
-  }catch(e){console.error(e);}
+document.getElementById('copyJwtBtn').addEventListener('click', async () => {
+  const text = document.getElementById('jwtOutput').textContent.trim();
+  if (text) {
+    await navigator.clipboard.writeText(text);
+    flashCopy('copyJwtBtn');
+  }
 });
+
+// API Key
+document.getElementById('generateApiBtn').addEventListener('click', () => {
+  const fmt = document.getElementById('apiKeyFormat').value;
+  const len = fmt === 'uuid' ? null : parseInt(document.getElementById('apiKeyLength').value) || 32;
+  const key = generateApiKey(fmt, len);
+  document.getElementById('apiOutput').textContent = key;
+  document.getElementById('copyApiBtn').disabled = false;
+});
+
+document.getElementById('copyApiBtn').addEventListener('click', async () => {
+  const text = document.getElementById('apiOutput').textContent.trim();
+  if (text) {
+    await navigator.clipboard.writeText(text);
+    flashCopy('copyApiBtn');
+  }
+});
+
+// HMAC
+document.getElementById('generateHmacBtn').addEventListener('click', () => {
+  const bytes = parseInt(document.getElementById('hmacByteLength').value) || 32;
+  const fmt = document.getElementById('hmacFormat').value;
+  const key = generateHmacKey(bytes, fmt);
+  document.getElementById('hmacOutput').textContent = key;
+  document.getElementById('copyHmacBtn').disabled = false;
+});
+
+document.getElementById('copyHmacBtn').addEventListener('click', async () => {
+  const text = document.getElementById('hmacOutput').textContent.trim();
+  if (text) {
+    await navigator.clipboard.writeText(text);
+    flashCopy('copyHmacBtn');
+  }
+});
+
+// RSA
+document.getElementById('generateRsaBtn').addEventListener('click', async () => {
+  const bits = parseInt(document.getElementById('rsaKeySize').value) || 3072;
+  try {
+    const keys = await generateRsaKeyPair(bits);
+    document.getElementById('rsaPrivateOutput').textContent = keys.privatePem;
+    document.getElementById('rsaPublicOutput').textContent = keys.publicPem;
+    document.getElementById('copyRsaPrivateBtn').disabled = false;
+    document.getElementById('copyRsaPublicBtn').disabled = false;
+  } catch (err) {
+    document.getElementById('rsaPrivateOutput').textContent = `Error: ${err.message}`;
+    document.getElementById('rsaPublicOutput').textContent = "";
+  }
+});
+
+document.getElementById('copyRsaPrivateBtn').addEventListener('click', async () => {
+  const text = document.getElementById('rsaPrivateOutput').textContent.trim();
+  if (text && !text.startsWith("Error")) {
+    await navigator.clipboard.writeText(text);
+    flashCopy('copyRsaPrivateBtn');
+  }
+});
+
+document.getElementById('copyRsaPublicBtn').addEventListener('click', async () => {
+  const text = document.getElementById('rsaPublicOutput').textContent.trim();
+  if (text && !text.startsWith("Error")) {
+    await navigator.clipboard.writeText(text);
+    flashCopy('copyRsaPublicBtn');
+  }
+});
+
+// Passphrase options visibility
+function updatePhraseVisibility() {
+  const isPhrase = document.querySelector('input[name="mode"]:checked')?.value === 'phrase';
+  document.getElementById('phrase-options').style.display = isPhrase ? 'block' : 'none';
+}
+document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', updatePhraseVisibility));
+updatePhraseVisibility();
 </script>
 
 </body>
