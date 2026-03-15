@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- FIX #12: Content Security Policy + referrer lockdown -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
+  <meta name="referrer" content="no-referrer">
   <title>Generator – Passwords · Secrets · Keys · RSA</title>
   <style>
     body {
@@ -44,13 +48,16 @@
     }
     .btn-primary  { background: #2563eb; color: white; }
     .btn-primary:hover  { background: #1d4ed8; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
     .btn-secondary { background: #64748b; color: white; }
     .btn-secondary:hover { background: #475569; }
+    .btn-secondary:disabled { background: #94a3b8; cursor: not-allowed; }
+    /* FIX #10: renamed strength level classes to avoid conflict with .strength container */
     .strength { font-weight: 600; }
-    .weak    { color: #ef4444; }
-    .moderate{ color: #f59e0b; }
-    .strong  { color: #10b981; }
-    .verystrong { color: #059669; }
+    .pw-weak     { color: #ef4444; }
+    .pw-moderate { color: #f59e0b; }
+    .pw-strong   { color: #10b981; }
+    .pw-verystrong { color: #059669; }
     .options {
       display: flex;
       flex-wrap: wrap;
@@ -71,6 +78,8 @@
     #error { color: #dc2626; font-weight: 500; margin: 1.2rem 0; display: none; }
     #phrase-options { display: none; }
     small { color: #64748b; font-size: 0.95rem; display: block; margin-bottom: 0.8rem; }
+    select:disabled { opacity: 0.45; cursor: not-allowed; }
+    .rsa-status { font-size: 0.95rem; color: #64748b; margin: 0.5rem 0; min-height: 1.4rem; }
   </style>
 </head>
 <body>
@@ -127,10 +136,10 @@
 
     <label style="margin-top:1.2rem">Length:</label>
     <select id="jwtLength">
-      <option value="32">32 chars (~192 bits)</option>
-      <option value="48" selected>48 chars (~288 bits – recommended)</option>
-      <option value="64">64 chars (~384 bits)</option>
-      <option value="96">96 chars (~576 bits)</option>
+      <option value="32">32 chars (~128 bits)</option>
+      <option value="48">48 chars (~192 bits)</option>
+      <option value="64" selected>64 chars (~256 bits – recommended)</option>
+      <option value="96">96 chars (~384 bits)</option>
     </select>
 
     <div style="margin-top:1.6rem">
@@ -152,7 +161,8 @@
       <option value="hex">Hexadecimal</option>
     </select>
 
-    <label style="margin-top:1.2rem">Length (alphanum & hex):</label>
+    <label style="margin-top:1.2rem">Length (alphanum &amp; hex):</label>
+    <!-- FIX #8: disabled state toggled by format selector -->
     <select id="apiKeyLength">
       <option value="24">24 chars</option>
       <option value="32" selected>32 chars</option>
@@ -200,7 +210,8 @@
   <!-- RSA Key Pair -->
   <div class="section">
     <h2>RSA Key Pair</h2>
-    <small>For SSH, JWT (RS256/RS384/RS512), code signing, encryption</small>
+    <!-- FIX #2: note updated to reflect RSA-PSS -->
+    <small>For SSH (GitHub, GitLab, servers), JWT (PS256/PS384/PS512), code signing. Private key: PKCS#8 PEM. Public key: OpenSSH format (paste directly into GitHub/GitLab).</small>
 
     <label style="margin-top:1.2rem">Key size:</label>
     <select id="rsaKeySize">
@@ -212,6 +223,8 @@
     <div style="margin-top:1.6rem">
       <button id="generateRsaBtn" class="btn-primary">Generate RSA Key Pair</button>
     </div>
+    <!-- FIX #9: loading status message -->
+    <div class="rsa-status" id="rsaStatus"></div>
 
     <div class="output copy-group">
       <strong>Private Key (PKCS#8 PEM):</strong><br>
@@ -220,9 +233,9 @@
     </div>
 
     <div class="output copy-group">
-      <strong>Public Key (SPKI PEM):</strong><br>
+      <strong>Public Key (OpenSSH) — paste this into GitHub / GitLab / authorized_keys:</strong><br>
       <div id="rsaPublicOutput">— not generated yet —</div>
-      <button id="copyRsaPublicBtn" class="btn-secondary" disabled>Copy Public</button>
+      <button id="copyRsaPublicBtn" class="btn-secondary" disabled>Copy Public Key</button>
     </div>
   </div>
 
@@ -230,7 +243,7 @@
 
 <script>
 // ────────────────────────────────────────────────
-//  State & wordlist (optional)
+//  State & wordlist
 // ────────────────────────────────────────────────
 let WORDS = [];
 let wordlistLoaded = false;
@@ -238,9 +251,18 @@ let wordlistLoaded = false;
 async function loadWordlist() {
   try {
     const res = await fetch('words.json');
-    if (!res.ok) throw new Error();
-    WORDS = await res.json();
-    if (Array.isArray(WORDS) && WORDS.length >= 100) wordlistLoaded = true;
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    // FIX #3: validate structure, count, and minimum word length
+    if (
+      !Array.isArray(data) ||
+      data.length < 100 ||
+      data.some(w => typeof w !== 'string' || w.length < 3 || !/^[a-z]+$/.test(w))
+    ) {
+      throw new Error('Wordlist failed validation');
+    }
+    WORDS = data;
+    wordlistLoaded = true;
   } catch {
     // silent fail – passphrase mode will warn user
   }
@@ -250,10 +272,17 @@ loadWordlist();
 // ────────────────────────────────────────────────
 //  Crypto helpers
 // ────────────────────────────────────────────────
+
+// FIX #1: rejection sampling eliminates modulo bias
 function getSecureRandomInt(max) {
-  const arr = new Uint32Array(1);
-  crypto.getRandomValues(arr);
-  return arr[0] % max;
+  const limit = 2 ** 32 - (2 ** 32 % max);
+  let value;
+  do {
+    const arr = new Uint32Array(1);
+    crypto.getRandomValues(arr);
+    value = arr[0];
+  } while (value >= limit);
+  return value % max;
 }
 
 function randomChoice(arr) {
@@ -269,6 +298,7 @@ function randomChar() {
   return pool[getSecureRandomInt(pool.length)];
 }
 
+// FIX #5: duplicate derToPem removed — single definition here
 function derToPem(der, label) {
   const base64 = btoa(String.fromCharCode(...new Uint8Array(der)));
   let pem = `-----BEGIN ${label}-----\n`;
@@ -277,6 +307,45 @@ function derToPem(der, label) {
   }
   pem += `-----END ${label}-----`;
   return pem;
+}
+
+// Converts a CryptoKey (RSA public) to OpenSSH wire format:
+// "ssh-rsa <base64(len+type + len+e + len+n)> generated-key"
+async function toOpenSSHPublicKey(cryptoPublicKey) {
+  const jwk = await crypto.subtle.exportKey("jwk", cryptoPublicKey);
+
+  function b64urlToBytes(s) {
+    const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64);
+    return Uint8Array.from(bin, c => c.charCodeAt(0));
+  }
+
+  function sshField(bytes) {
+    const out = new Uint8Array(4 + bytes.length);
+    new DataView(out.buffer).setUint32(0, bytes.length, false);
+    out.set(bytes, 4);
+    return out;
+  }
+
+  const keyType = new TextEncoder().encode("ssh-rsa");
+  const exponent = b64urlToBytes(jwk.e);
+  let modulus = b64urlToBytes(jwk.n);
+
+  // OpenSSH requires a leading zero byte on the modulus if the high bit is set
+  // (to signal a positive integer in the SSH mpint encoding)
+  if (modulus[0] & 0x80) {
+    const padded = new Uint8Array(modulus.length + 1);
+    padded.set(modulus, 1);
+    modulus = padded;
+  }
+
+  const parts = [sshField(keyType), sshField(exponent), sshField(modulus)];
+  const total = parts.reduce((s, p) => s + p.length, 0);
+  const blob = new Uint8Array(total);
+  let offset = 0;
+  for (const p of parts) { blob.set(p, offset); offset += p.length; }
+
+  return `ssh-rsa ${btoa(String.fromCharCode(...blob))} generated-key`;
 }
 
 // ────────────────────────────────────────────────
@@ -288,7 +357,7 @@ function generatePassword() {
 
   if (mode === 'phrase') {
     if (!wordlistLoaded || WORDS.length < 10) {
-      return "Passphrase mode unavailable (wordlist missing) – using random characters instead.";
+      return { text: null, error: "Passphrase mode unavailable (wordlist missing) – switch to random characters." };
     }
     let count = {simple:4, good:5, strong:6, verystrong:6}[strength] || 5;
     let capitalize = strength !== 'simple';
@@ -298,33 +367,43 @@ function generatePassword() {
     let words = Array.from({length: count}, () => randomChoice(WORDS));
     if (capitalize) words = words.map(w => w.charAt(0).toUpperCase() + w.slice(1));
 
-    let pwd = words.join(sep);
+    let pwd;
+    if (sep === '') {
+      // CamelCase: always capitalise even if strength is simple
+      pwd = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+    } else {
+      pwd = words.join(sep);
+    }
+
     const d = randomDigit();
     if (digitMode === 'begin' || digitMode === 'both') pwd = d + pwd;
     if (digitMode === 'end'   || digitMode === 'both') pwd += d;
-    return pwd;
+    return { text: pwd, wordCount: count, sep };
   }
 
   // chars mode
   let len = {simple:12, good:16, strong:20, verystrong:24}[strength] || 16;
   let p = '';
   for (let i = 0; i < len; i++) p += randomChar();
-  return p;
+  return { text: p };
 }
 
-function estimateStrength(pwd) {
+// FIX #6: estimateStrength now receives generation metadata to handle CamelCase correctly
+function estimateStrength(pwd, meta = {}) {
   if (!pwd) return "—";
 
   let bits = 0;
-  const hasSep = /[\s-]/.test(pwd);
+  const hasSep = /[\s\-.]/.test(pwd);
   const hasUpper = /[A-Z]/.test(pwd);
   const hasDigit = /\d/.test(pwd);
 
-  const parts = pwd.split(/[\s-]+/).filter(Boolean);
-  const isPassphrase = hasSep && parts.length >= 3;
+  // A passphrase in CamelCase mode has no separator but meta.wordCount tells us
+  const isPassphrase = (hasSep && pwd.split(/[\s\-.]+/).filter(Boolean).length >= 3)
+    || (meta.wordCount >= 3 && meta.sep === '');
 
   if (isPassphrase && wordlistLoaded) {
-    bits = Math.log2(Math.max(WORDS.length, 2048)) * parts.length;
+    const parts = meta.wordCount || pwd.split(/[\s\-.]+/).filter(Boolean).length;
+    bits = Math.log2(WORDS.length) * parts;
     if (hasUpper) bits += 2.5;
     if (hasDigit) bits += 3.3;
   } else {
@@ -336,21 +415,22 @@ function estimateStrength(pwd) {
     bits = Math.log2(pool || 1) * pwd.length;
   }
 
+  // FIX #10: use pw-* classes instead of bare .strong etc. to avoid CSS conflicts
   let label, cls;
-  if      (bits <  50) { label = "Very weak"; cls = "weak"; }
-  else if (bits <  70) { label = "Weak";      cls = "weak"; }
-  else if (bits <  90) { label = "Good";      cls = "moderate"; }
-  else if (bits < 110) { label = "Strong";    cls = "strong"; }
-  else                 { label = "Very strong"; cls = "verystrong"; }
+  if      (bits <  50) { label = "Very weak";   cls = "pw-weak"; }
+  else if (bits <  70) { label = "Weak";         cls = "pw-weak"; }
+  else if (bits <  90) { label = "Good";         cls = "pw-moderate"; }
+  else if (bits < 110) { label = "Strong";       cls = "pw-strong"; }
+  else                 { label = "Very strong";  cls = "pw-verystrong"; }
 
   return `<span class="${cls}">${label}</span> (~${Math.round(bits)} bits)`;
 }
 
 function generateJwtSecret(length) {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-  let s = "";
-  for (let i = 0; i < length; i++) s += chars[getSecureRandomInt(chars.length)];
-  return s;
+  const byteLength = length / 2;
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function generateApiKey(format, length) {
@@ -378,10 +458,11 @@ function generateHmacKey(byteLength, format) {
   return format === "base64" ? b64 : b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
 
+// FIX #2: switched from RSASSA-PKCS1-v1_5 to RSA-PSS
 async function generateRsaKeyPair(bits = 3072) {
   const keyPair = await crypto.subtle.generateKey(
     {
-      name: "RSASSA-PKCS1-v1_5",
+      name: "RSA-PSS",
       modulusLength: bits,
       publicExponent: new Uint8Array([1, 0, 1]),
       hash: "SHA-256"
@@ -393,59 +474,58 @@ async function generateRsaKeyPair(bits = 3072) {
   const privDer = await crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
   const privPem = derToPem(privDer, "PRIVATE KEY");
 
-  const pubDer = await crypto.subtle.exportKey("spki", keyPair.publicKey);
-  const pubPem = derToPem(pubDer, "PUBLIC KEY");
+  const sshPub = await toOpenSSHPublicKey(keyPair.publicKey);
 
-  return { privatePem: privPem, publicPem: pubPem };
+  return { privatePem: privPem, publicPem: sshPub };
 }
 
-function derToPem(der, label) {
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(der)));
-  let pem = `-----BEGIN ${label}-----\n`;
-  for (let i = 0; i < base64.length; i += 64) {
-    pem += base64.slice(i, i + 64) + "\n";
+// ────────────────────────────────────────────────
+//  Copy helper
+// FIX #4 + #11: try/catch on all clipboard calls; flashCopy only fires on success
+// ────────────────────────────────────────────────
+async function copyToClipboard(text, btnId) {
+  try {
+    await navigator.clipboard.writeText(text);
+    const btn = document.getElementById(btnId);
+    const orig = btn.textContent;
+    btn.textContent = "Copied!";
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.disabled = false;
+    }, 1400);
+  } catch {
+    alert('Could not access clipboard – please copy the text manually.');
   }
-  pem += `-----END ${label}-----`;
-  return pem;
 }
 
 // ────────────────────────────────────────────────
-//  Copy feedback
-// ────────────────────────────────────────────────
-function flashCopy(btnId) {
-  const btn = document.getElementById(btnId);
-  const orig = btn.textContent;
-  btn.textContent = "Copied!";
-  btn.disabled = true;
-  setTimeout(() => {
-    btn.textContent = orig;
-    btn.disabled = false;
-  }, 1400);
-}
-
-// ────────────────────────────────────────────────
-//  Event listeners – all sections
+//  Event listeners
 // ────────────────────────────────────────────────
 
 // Password / Passphrase
 document.getElementById('generatePwdBtn').addEventListener('click', () => {
-  const pwd = generatePassword();
-  document.getElementById('pwdOutput').textContent = pwd;
-  document.getElementById('pwdStrength').innerHTML = estimateStrength(pwd);
+  const result = generatePassword();
+  // FIX #7: error string no longer passed to estimateStrength
+  if (!result.text) {
+    document.getElementById('pwdOutput').textContent = result.error;
+    document.getElementById('pwdStrength').innerHTML = '—';
+    document.getElementById('copyPwdBtn').disabled = true;
+    return;
+  }
+  document.getElementById('pwdOutput').textContent = result.text;
+  document.getElementById('pwdStrength').innerHTML = estimateStrength(result.text, result);
   document.getElementById('copyPwdBtn').disabled = false;
 });
 
 document.getElementById('copyPwdBtn').addEventListener('click', async () => {
   const text = document.getElementById('pwdOutput').textContent.trim();
-  if (text) {
-    await navigator.clipboard.writeText(text);
-    flashCopy('copyPwdBtn');
-  }
+  if (text) await copyToClipboard(text, 'copyPwdBtn');
 });
 
 // JWT
 document.getElementById('generateJwtBtn').addEventListener('click', () => {
-  const len = parseInt(document.getElementById('jwtLength').value) || 48;
+  const len = parseInt(document.getElementById('jwtLength').value) || 64;
   const secret = generateJwtSecret(len);
   document.getElementById('jwtOutput').textContent = secret;
   document.getElementById('copyJwtBtn').disabled = false;
@@ -453,10 +533,7 @@ document.getElementById('generateJwtBtn').addEventListener('click', () => {
 
 document.getElementById('copyJwtBtn').addEventListener('click', async () => {
   const text = document.getElementById('jwtOutput').textContent.trim();
-  if (text) {
-    await navigator.clipboard.writeText(text);
-    flashCopy('copyJwtBtn');
-  }
+  if (text) await copyToClipboard(text, 'copyJwtBtn');
 });
 
 // API Key
@@ -470,10 +547,12 @@ document.getElementById('generateApiBtn').addEventListener('click', () => {
 
 document.getElementById('copyApiBtn').addEventListener('click', async () => {
   const text = document.getElementById('apiOutput').textContent.trim();
-  if (text) {
-    await navigator.clipboard.writeText(text);
-    flashCopy('copyApiBtn');
-  }
+  if (text) await copyToClipboard(text, 'copyApiBtn');
+});
+
+// FIX #8: disable length dropdown when UUID is selected
+document.getElementById('apiKeyFormat').addEventListener('change', function() {
+  document.getElementById('apiKeyLength').disabled = this.value === 'uuid';
 });
 
 // HMAC
@@ -487,41 +566,44 @@ document.getElementById('generateHmacBtn').addEventListener('click', () => {
 
 document.getElementById('copyHmacBtn').addEventListener('click', async () => {
   const text = document.getElementById('hmacOutput').textContent.trim();
-  if (text) {
-    await navigator.clipboard.writeText(text);
-    flashCopy('copyHmacBtn');
-  }
+  if (text) await copyToClipboard(text, 'copyHmacBtn');
 });
 
-// RSA
+// RSA — FIX #9: loading state while key is being generated
 document.getElementById('generateRsaBtn').addEventListener('click', async () => {
   const bits = parseInt(document.getElementById('rsaKeySize').value) || 3072;
+  const btn = document.getElementById('generateRsaBtn');
+  const status = document.getElementById('rsaStatus');
+
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  status.textContent = `Generating ${bits}-bit RSA key pair, please wait…`;
+
   try {
     const keys = await generateRsaKeyPair(bits);
     document.getElementById('rsaPrivateOutput').textContent = keys.privatePem;
     document.getElementById('rsaPublicOutput').textContent = keys.publicPem;
     document.getElementById('copyRsaPrivateBtn').disabled = false;
     document.getElementById('copyRsaPublicBtn').disabled = false;
+    status.textContent = `${bits}-bit RSA-PSS key pair generated.`;
   } catch (err) {
     document.getElementById('rsaPrivateOutput').textContent = `Error: ${err.message}`;
-    document.getElementById('rsaPublicOutput').textContent = "";
+    document.getElementById('rsaPublicOutput').textContent = '';
+    status.textContent = '';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate RSA Key Pair';
   }
 });
 
 document.getElementById('copyRsaPrivateBtn').addEventListener('click', async () => {
   const text = document.getElementById('rsaPrivateOutput').textContent.trim();
-  if (text && !text.startsWith("Error")) {
-    await navigator.clipboard.writeText(text);
-    flashCopy('copyRsaPrivateBtn');
-  }
+  if (text && !text.startsWith('Error')) await copyToClipboard(text, 'copyRsaPrivateBtn');
 });
 
 document.getElementById('copyRsaPublicBtn').addEventListener('click', async () => {
   const text = document.getElementById('rsaPublicOutput').textContent.trim();
-  if (text && !text.startsWith("Error")) {
-    await navigator.clipboard.writeText(text);
-    flashCopy('copyRsaPublicBtn');
-  }
+  if (text && !text.startsWith('Error')) await copyToClipboard(text, 'copyRsaPublicBtn');
 });
 
 // Passphrase options visibility
