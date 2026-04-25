@@ -1,619 +1,537 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- FIX #12: Content Security Policy + referrer lockdown -->
-  <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
-  <meta name="referrer" content="no-referrer">
-  <title>Generator – Passwords · Secrets · Keys · RSA</title>
-  <style>
-    body {
-      font-family: system-ui, sans-serif;
-      max-width: 820px;
-      margin: 2rem auto;
-      padding: 0 1rem;
-      line-height: 1.6;
-    }
-    h1, h2 { text-align: center; margin-bottom: 1.4rem; }
-    .section {
-      margin: 2.2rem 0;
-      padding: 1.6rem;
-      background: #f9fafb;
-      border-radius: 10px;
-      border: 1px solid #e5e7eb;
-    }
-    label { display: block; margin: 0.7rem 0; font-weight: 500; }
-    select, input[type="radio"] { margin-right: 0.8rem; }
-    .output {
-      font-family: 'Courier New', Consolas, monospace;
-      background: #f1f5f9;
-      padding: 1.3rem;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      word-break: break-all;
-      min-height: 4rem;
-      font-size: 1.05rem;
-      white-space: pre-wrap;
-      margin: 1rem 0;
-    }
-    button {
-      padding: 0.8rem 1.6rem;
-      margin: 0.5rem 0.5rem 0.5rem 0;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 1.05rem;
-    }
-    .btn-primary  { background: #2563eb; color: white; }
-    .btn-primary:hover  { background: #1d4ed8; }
-    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
-    .btn-secondary { background: #64748b; color: white; }
-    .btn-secondary:hover { background: #475569; }
-    .btn-secondary:disabled { background: #94a3b8; cursor: not-allowed; }
-    /* FIX #10: renamed strength level classes to avoid conflict with .strength container */
-    .strength { font-weight: 600; }
-    .pw-weak     { color: #ef4444; }
-    .pw-moderate { color: #f59e0b; }
-    .pw-strong   { color: #10b981; }
-    .pw-verystrong { color: #059669; }
-    .options {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1.2rem;
-      margin: 1rem 0;
-    }
-    .options label {
-      padding: 0.7rem 1.4rem;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      cursor: pointer;
-      background: white;
-    }
-    .options input:checked + span {
-      font-weight: bold;
-      background: #e5e7eb;
-    }
-    #error { color: #dc2626; font-weight: 500; margin: 1.2rem 0; display: none; }
-    #phrase-options { display: none; }
-    small { color: #64748b; font-size: 0.95rem; display: block; margin-bottom: 0.8rem; }
-    select:disabled { opacity: 0.45; cursor: not-allowed; }
-    .rsa-status { font-size: 0.95rem; color: #64748b; margin: 0.5rem 0; min-height: 1.4rem; }
-  </style>
-</head>
-<body>
 
-  <h1>Generator – Passwords · Secrets · Keys · RSA</h1>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;600;800&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0d0f12;--surface:#161a20;--surface2:#1e232b;--border:#2a3040;
+    --accent:#00e5a0;--accent2:#4dabf7;--text:#e8eaf0;--muted:#6b7590;
+    --danger:#ff6b6b;--warn:#ffd43b;
+    --mono:'JetBrains Mono',monospace;--display:'Syne',sans-serif;
+  }
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;padding:0}
+  .app{max-width:700px;margin:0 auto;padding:1.5rem}
+  .app-title{font-family:var(--display);font-size:22px;font-weight:800;color:var(--accent);letter-spacing:-0.5px;margin-bottom:0.25rem}
+  .app-sub{color:var(--muted);font-size:11px;margin-bottom:1.5rem;letter-spacing:0.5px}
+  .tab-bar{display:flex;gap:2px;margin-bottom:1.5rem;background:var(--surface);padding:4px;border-radius:10px;border:0.5px solid var(--border)}
+  .tab{flex:1;padding:8px 4px;text-align:center;border:none;background:transparent;color:var(--muted);font-family:var(--mono);font-size:11px;cursor:pointer;border-radius:7px;transition:all 0.15s;letter-spacing:0.3px}
+  .tab.active{background:var(--surface2);color:var(--accent);font-weight:600}
+  .tab:hover:not(.active){color:var(--text)}
+  .panel{display:none}.panel.active{display:block}
+  .field{margin-bottom:1.2rem}
+  .label{display:block;font-size:11px;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px}
+  .radio-group{display:flex;flex-wrap:wrap;gap:6px}
+  .radio-opt{position:relative}
+  .radio-opt input{position:absolute;opacity:0;width:0;height:0}
+  .radio-opt label{display:block;padding:6px 12px;border:0.5px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px;color:var(--muted);background:var(--surface);transition:all 0.12s}
+  .radio-opt input:checked+label{border-color:var(--accent);color:var(--accent);background:rgba(0,229,160,0.08)}
+  .radio-opt label:hover{border-color:var(--accent2);color:var(--text)}
+  select{background:var(--surface2);border:0.5px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:8px 10px;border-radius:6px;width:100%;outline:none;cursor:pointer}
+  select:focus{border-color:var(--accent2)}
+  select option{background:var(--surface2)}
+  select:disabled{opacity:0.35;cursor:not-allowed}
+  .output-box{background:var(--surface);border:0.5px solid var(--border);border-radius:8px;padding:14px;margin:1rem 0;font-family:var(--mono);font-size:12px;word-break:break-all;white-space:pre-wrap;min-height:52px;line-height:1.6;color:#a0eacd}
+  .output-box.placeholder{color:var(--muted)}
+  .output-label{font-size:10px;color:var(--muted);letter-spacing:0.6px;margin-bottom:6px;text-transform:uppercase}
+  .env-line{font-size:11px;color:var(--muted);margin-top:6px;padding:8px 12px;background:var(--surface2);border-radius:6px;border:0.5px solid var(--border)}
+  .env-line .env-key{color:#ffd43b}
+  .env-line .env-val{color:#a0eacd;word-break:break-all}
+  .btn-row{display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap}
+  .btn{padding:8px 18px;border:0.5px solid var(--border);border-radius:6px;font-family:var(--mono);font-size:12px;cursor:pointer;transition:all 0.12s;letter-spacing:0.3px}
+  .btn-gen{background:var(--accent);border-color:var(--accent);color:#0a1a12;font-weight:600}
+  .btn-gen:hover{background:#00ffb3}
+  .btn-gen:disabled{background:#1a3d2e;border-color:#1a3d2e;color:#2a5a3e;cursor:not-allowed}
+  .btn-copy{background:transparent;color:var(--muted)}
+  .btn-copy:hover{color:var(--accent2);border-color:var(--accent2)}
+  .btn-copy:disabled{opacity:0.35;cursor:not-allowed}
+  .btn-copy.copied{color:var(--accent);border-color:var(--accent)}
+  .strength-bar{height:3px;border-radius:2px;margin:8px 0 4px;background:var(--surface2);overflow:hidden}
+  .strength-fill{height:100%;border-radius:2px;transition:width 0.3s,background 0.3s}
+  .strength-text{font-size:10px;color:var(--muted)}
+  .bits-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;background:rgba(77,171,247,0.1);color:var(--accent2);border:0.5px solid rgba(77,171,247,0.2);margin-left:6px}
+  .sub-options{background:var(--surface);border:0.5px solid var(--border);border-radius:8px;padding:14px;margin:1rem 0}
+  .sub-options .label{margin-top:10px}
+  .sub-options .label:first-child{margin-top:0}
+  .rsa-key-block{margin-bottom:1rem}
+  .warn-text{color:var(--warn);font-size:11px;margin-top:6px}
+  .status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:6px;vertical-align:middle;animation:pulse 1.5s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .generating-msg{color:var(--muted);font-size:11px;display:flex;align-items:center}
+  .tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;border:0.5px solid;margin-left:6px;vertical-align:middle}
+  .tag-weak{color:var(--danger);border-color:rgba(255,107,107,0.4);background:rgba(255,107,107,0.08)}
+  .tag-ok{color:var(--warn);border-color:rgba(255,212,59,0.4);background:rgba(255,212,59,0.08)}
+  .tag-good{color:#74c69d;border-color:rgba(116,198,157,0.4);background:rgba(116,198,157,0.08)}
+  .tag-strong{color:var(--accent);border-color:rgba(0,229,160,0.4);background:rgba(0,229,160,0.08)}
+  .cmd-line{background:var(--surface2);border:0.5px solid var(--border);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--muted);margin-bottom:1.2rem;display:flex;align-items:center;gap:8px}
+  .cmd-line .prompt{color:#4dabf7}
+  .cmd-line .cmd{color:#a0eacd}
+  .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;border:0.5px solid rgba(0,229,160,0.4);background:rgba(0,229,160,0.08);color:var(--accent)}
+</style>
 
-  <!-- Password / Passphrase -->
-  <div class="section">
-    <h2>Password / Passphrase</h2>
+<div class="app">
+  <div class="app-title">⟨ key forge ⟩</div>
+  <div class="app-sub">PASSWORDS · SECRETS · HMAC · RSA · ENCRYPTION — BROWSER-ONLY, ZERO NETWORK</div>
 
-    <label>Type:</label>
-    <label><input type="radio" name="mode" value="phrase" checked> Passphrase (words)</label>
-    <label><input type="radio" name="mode" value="chars"> Random characters</label>
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchTab('pw')">Password</button>
+    <button class="tab" onclick="switchTab('jwt')">JWT Secret</button>
+    <button class="tab" onclick="switchTab('api')">API Key</button>
+    <button class="tab" onclick="switchTab('hmac')">HMAC</button>
+    <button class="tab" onclick="switchTab('enc')">Encryption</button>
+    <button class="tab" onclick="switchTab('rsa')">RSA Pair</button>
+  </div>
 
-    <label style="margin-top:1.2rem">Complexity:</label>
-    <div class="options">
-      <label><input type="radio" name="strength" value="simple" checked><span>Simple</span></label>
-      <label><input type="radio" name="strength" value="good"><span>Good</span></label>
-      <label><input type="radio" name="strength" value="strong"><span>Strong</span></label>
-      <label><input type="radio" name="strength" value="verystrong"><span>Very strong</span></label>
-    </div>
-
-    <div id="phrase-options">
-      <label style="margin-top:1.2rem">Separator:</label>
-      <div class="options">
-        <label><input type="radio" name="separator" value=" " checked><span>Space</span></label>
-        <label><input type="radio" name="separator" value="-"><span>Hyphen</span></label>
-        <label><input type="radio" name="separator" value="."><span>Dot</span></label>
-        <label><input type="radio" name="separator" value=""><span>CamelCase</span></label>
-      </div>
-
-      <label style="margin-top:1.2rem">Add random digit:</label>
-      <div class="options">
-        <label><input type="radio" name="digit" value="none" checked><span>None</span></label>
-        <label><input type="radio" name="digit" value="begin"><span>Beginning</span></label>
-        <label><input type="radio" name="digit" value="end"><span>End</span></label>
-        <label><input type="radio" name="digit" value="both"><span>Both</span></label>
+  <!-- PASSWORD -->
+  <div id="tab-pw" class="panel active">
+    <div class="field">
+      <span class="label">Type</span>
+      <div class="radio-group">
+        <div class="radio-opt"><input type="radio" name="mode" id="mode-phrase" value="phrase" checked onchange="updateModeUI()"><label for="mode-phrase">Passphrase (words)</label></div>
+        <div class="radio-opt"><input type="radio" name="mode" id="mode-chars" value="chars" onchange="updateModeUI()"><label for="mode-chars">Random characters</label></div>
+        <div class="radio-opt"><input type="radio" name="mode" id="mode-pin" value="pin" onchange="updateModeUI()"><label for="mode-pin">PIN</label></div>
+        <div class="radio-opt"><input type="radio" name="mode" id="mode-hex" value="hexpasswd" onchange="updateModeUI()"><label for="mode-hex">Hex string</label></div>
       </div>
     </div>
 
-    <div style="margin-top:1.6rem">
-      <button id="generatePwdBtn" class="btn-primary">Generate Password</button>
-      <button id="copyPwdBtn" class="btn-secondary" disabled>Copy</button>
+    <div class="field">
+      <span class="label">Complexity</span>
+      <div class="radio-group">
+        <div class="radio-opt"><input type="radio" name="strength" id="s-simple" value="simple" checked><label for="s-simple">Simple</label></div>
+        <div class="radio-opt"><input type="radio" name="strength" id="s-good" value="good"><label for="s-good">Good</label></div>
+        <div class="radio-opt"><input type="radio" name="strength" id="s-strong" value="strong"><label for="s-strong">Strong</label></div>
+        <div class="radio-opt"><input type="radio" name="strength" id="s-vs" value="verystrong"><label for="s-vs">Very strong</label></div>
+      </div>
     </div>
 
-    <div class="output" id="pwdOutput">Click Generate Password…</div>
-    <div>Strength: <span class="strength" id="pwdStrength"></span></div>
+    <!-- Passphrase sub-options -->
+    <div id="phrase-opts" class="sub-options">
+      <span class="label">Separator</span>
+      <div class="radio-group">
+        <div class="radio-opt"><input type="radio" name="sep" id="sep-space" value=" " checked><label for="sep-space">Space</label></div>
+        <div class="radio-opt"><input type="radio" name="sep" id="sep-dash" value="-"><label for="sep-dash">Hyphen</label></div>
+        <div class="radio-opt"><input type="radio" name="sep" id="sep-dot" value="."><label for="sep-dot">Dot</label></div>
+        <div class="radio-opt"><input type="radio" name="sep" id="sep-camel" value=""><label for="sep-camel">CamelCase</label></div>
+      </div>
+      <span class="label" style="margin-top:12px">Random digit</span>
+      <div class="radio-group">
+        <div class="radio-opt"><input type="radio" name="digit" id="d-none" value="none" checked><label for="d-none">None</label></div>
+        <div class="radio-opt"><input type="radio" name="digit" id="d-beg" value="begin"><label for="d-beg">Prefix</label></div>
+        <div class="radio-opt"><input type="radio" name="digit" id="d-end" value="end"><label for="d-end">Suffix</label></div>
+        <div class="radio-opt"><input type="radio" name="digit" id="d-both" value="both"><label for="d-both">Both</label></div>
+      </div>
+    </div>
+
+    <!-- Chars sub-options -->
+    <div id="chars-opts" class="sub-options" style="display:none">
+      <span class="label">Character set</span>
+      <div class="radio-group">
+        <div class="radio-opt"><input type="radio" name="charset" id="cs-full" value="full" checked><label for="cs-full">Full (a-z A-Z 0-9 symbols)</label></div>
+        <div class="radio-opt"><input type="radio" name="charset" id="cs-alphanum" value="alphanum"><label for="cs-alphanum">Alphanumeric only</label></div>
+        <div class="radio-opt"><input type="radio" name="charset" id="cs-lower" value="lower"><label for="cs-lower">Lowercase + digits</label></div>
+      </div>
+    </div>
+
+    <!-- PIN sub-options -->
+    <div id="pin-opts" class="sub-options" style="display:none">
+      <span class="label">PIN length</span>
+      <div class="radio-group">
+        <div class="radio-opt"><input type="radio" name="pinlen" id="pin4" value="4" checked><label for="pin4">4 digits</label></div>
+        <div class="radio-opt"><input type="radio" name="pinlen" id="pin6" value="6"><label for="pin6">6 digits</label></div>
+        <div class="radio-opt"><input type="radio" name="pinlen" id="pin8" value="8"><label for="pin8">8 digits</label></div>
+      </div>
+    </div>
+
+    <!-- Hex sub-options -->
+    <div id="hex-opts" class="sub-options" style="display:none">
+      <span class="label">Length (bytes → hex chars = 2×)</span>
+      <div class="radio-group">
+        <div class="radio-opt"><input type="radio" name="hexlen" id="hx16" value="16"><label for="hx16">16 B → 32 chars</label></div>
+        <div class="radio-opt"><input type="radio" name="hexlen" id="hx32" value="32" checked><label for="hx32">32 B → 64 chars</label></div>
+        <div class="radio-opt"><input type="radio" name="hexlen" id="hx64" value="64"><label for="hx64">64 B → 128 chars</label></div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-gen" onclick="doPassword()">Generate</button>
+      <button class="btn btn-copy" id="copy-pw" disabled onclick="copyField('pw-out','copy-pw')">Copy</button>
+    </div>
+    <div class="output-label">Output</div>
+    <div class="output-box placeholder" id="pw-out">click generate…</div>
+    <div class="strength-bar"><div class="strength-fill" id="sw-fill" style="width:0%;background:var(--danger)"></div></div>
+    <div class="strength-text" id="sw-text"></div>
   </div>
 
-  <!-- JWT / General Secret -->
-  <div class="section">
-    <h2>JWT / General Secret</h2>
-    <small>Used for signing JWTs, sessions, encryption, etc.</small>
-
-    <label style="margin-top:1.2rem">Length:</label>
-    <select id="jwtLength">
-      <option value="32">32 chars (~128 bits)</option>
-      <option value="48">48 chars (~192 bits)</option>
-      <option value="64" selected>64 chars (~256 bits – recommended)</option>
-      <option value="96">96 chars (~384 bits)</option>
-    </select>
-
-    <div style="margin-top:1.6rem">
-      <button id="generateJwtBtn" class="btn-primary">Generate Secret</button>
-      <button id="copyJwtBtn" class="btn-secondary" disabled>Copy</button>
+  <!-- JWT -->
+  <div id="tab-jwt" class="panel">
+    <div class="field">
+      <span class="label">Length</span>
+      <select id="jwt-len">
+        <option value="32">32 chars (~128 bit)</option>
+        <option value="48">48 chars (~192 bit)</option>
+        <option value="64" selected>64 chars (~256 bit – recommended)</option>
+        <option value="96">96 chars (~384 bit)</option>
+      </select>
     </div>
-
-    <div class="output" id="jwtOutput">Click Generate Secret…</div>
+    <div class="btn-row">
+      <button class="btn btn-gen" onclick="doJwt()">Generate</button>
+      <button class="btn btn-copy" id="copy-jwt" disabled onclick="copyField('jwt-out','copy-jwt')">Copy</button>
+    </div>
+    <div class="output-label">Secret (hex)</div>
+    <div class="output-box placeholder" id="jwt-out">click generate…</div>
   </div>
 
-  <!-- API Key / Token -->
-  <div class="section">
-    <h2>API Key / Token</h2>
-
-    <label style="margin-top:1.2rem">Format:</label>
-    <select id="apiKeyFormat">
-      <option value="uuid">UUID v4 (36 chars)</option>
-      <option value="alphanum" selected>Alphanumeric</option>
-      <option value="hex">Hexadecimal</option>
-    </select>
-
-    <label style="margin-top:1.2rem">Length (alphanum &amp; hex):</label>
-    <!-- FIX #8: disabled state toggled by format selector -->
-    <select id="apiKeyLength">
-      <option value="24">24 chars</option>
-      <option value="32" selected>32 chars</option>
-      <option value="40">40 chars</option>
-      <option value="48">48 chars</option>
-      <option value="64">64 chars</option>
-    </select>
-
-    <div style="margin-top:1.6rem">
-      <button id="generateApiBtn" class="btn-primary">Generate API Key</button>
-      <button id="copyApiBtn" class="btn-secondary" disabled>Copy</button>
+  <!-- API KEY -->
+  <div id="tab-api" class="panel">
+    <div class="field">
+      <span class="label">Format</span>
+      <select id="api-fmt" onchange="toggleApiLen()">
+        <option value="uuid">UUID v4 (36 chars)</option>
+        <option value="alphanum" selected>Alphanumeric</option>
+        <option value="hex">Hexadecimal</option>
+      </select>
     </div>
-
-    <div class="output" id="apiOutput">Click Generate API Key…</div>
+    <div class="field">
+      <span class="label">Length (alphanum &amp; hex)</span>
+      <select id="api-len">
+        <option value="24">24 chars</option>
+        <option value="32" selected>32 chars</option>
+        <option value="40">40 chars</option>
+        <option value="48">48 chars</option>
+        <option value="64">64 chars</option>
+      </select>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-gen" onclick="doApi()">Generate</button>
+      <button class="btn btn-copy" id="copy-api" disabled onclick="copyField('api-out','copy-api')">Copy</button>
+    </div>
+    <div class="output-label">Key</div>
+    <div class="output-box placeholder" id="api-out">click generate…</div>
   </div>
 
-  <!-- HMAC Key -->
-  <div class="section">
-    <h2>HMAC / Signing Key</h2>
-
-    <label style="margin-top:1.2rem">Key length (bytes):</label>
-    <select id="hmacByteLength">
-      <option value="16">16 bytes (128 bit)</option>
-      <option value="24">24 bytes (192 bit)</option>
-      <option value="32" selected>32 bytes (256 bit – recommended)</option>
-      <option value="48">48 bytes</option>
-      <option value="64">64 bytes (512 bit)</option>
-    </select>
-
-    <label style="margin-top:1.2rem">Format:</label>
-    <select id="hmacFormat">
-      <option value="hex" selected>Hex</option>
-      <option value="base64">Base64</option>
-      <option value="base64url">Base64url</option>
-    </select>
-
-    <div style="margin-top:1.6rem">
-      <button id="generateHmacBtn" class="btn-primary">Generate HMAC Key</button>
-      <button id="copyHmacBtn" class="btn-secondary" disabled>Copy</button>
+  <!-- HMAC -->
+  <div id="tab-hmac" class="panel">
+    <div class="field">
+      <span class="label">Key size (bytes)</span>
+      <select id="hmac-bytes">
+        <option value="16">16 bytes (128 bit)</option>
+        <option value="24">24 bytes (192 bit)</option>
+        <option value="32" selected>32 bytes (256 bit – recommended)</option>
+        <option value="48">48 bytes (384 bit)</option>
+        <option value="64">64 bytes (512 bit)</option>
+      </select>
     </div>
-
-    <div class="output" id="hmacOutput">Click Generate HMAC Key…</div>
+    <div class="field">
+      <span class="label">Encoding</span>
+      <select id="hmac-fmt">
+        <option value="hex" selected>Hex</option>
+        <option value="base64">Base64</option>
+        <option value="base64url">Base64url</option>
+      </select>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-gen" onclick="doHmac()">Generate</button>
+      <button class="btn btn-copy" id="copy-hmac" disabled onclick="copyField('hmac-out','copy-hmac')">Copy</button>
+    </div>
+    <div class="output-label">Key</div>
+    <div class="output-box placeholder" id="hmac-out">click generate…</div>
   </div>
 
-  <!-- RSA Key Pair -->
-  <div class="section">
-    <h2>RSA Key Pair</h2>
-    <!-- FIX #2: note updated to reflect RSA-PSS -->
-    <small>For SSH (GitHub, GitLab, servers), JWT (PS256/PS384/PS512), code signing. Private key: PKCS#8 PEM. Public key: OpenSSH format (paste directly into GitHub/GitLab).</small>
-
-    <label style="margin-top:1.2rem">Key size:</label>
-    <select id="rsaKeySize">
-      <option value="2048">2048 bits</option>
-      <option value="3072" selected>3072 bits (recommended)</option>
-      <option value="4096">4096 bits (high security)</option>
-    </select>
-
-    <div style="margin-top:1.6rem">
-      <button id="generateRsaBtn" class="btn-primary">Generate RSA Key Pair</button>
+  <!-- ENCRYPTION KEY -->
+  <div id="tab-enc" class="panel">
+    <div class="cmd-line">
+      <span class="prompt">$</span>
+      <span class="cmd">openssl rand -hex <span id="cmd-bytes">32</span></span>
     </div>
-    <!-- FIX #9: loading status message -->
-    <div class="rsa-status" id="rsaStatus"></div>
-
-    <div class="output copy-group">
-      <strong>Private Key (PKCS#8 PEM):</strong><br>
-      <div id="rsaPrivateOutput">— not generated yet —</div>
-      <button id="copyRsaPrivateBtn" class="btn-secondary" disabled>Copy Private</button>
+    <div class="field">
+      <span class="label">Key size</span>
+      <div class="radio-group">
+        <div class="radio-opt"><input type="radio" name="eksize" id="ek16" value="16" onchange="document.getElementById('cmd-bytes').textContent=16"><label for="ek16">16 bytes (128 bit)</label></div>
+        <div class="radio-opt"><input type="radio" name="eksize" id="ek32" value="32" checked onchange="document.getElementById('cmd-bytes').textContent=32"><label for="ek32">32 bytes (256 bit)</label></div>
+        <div class="radio-opt"><input type="radio" name="eksize" id="ek64" value="64" onchange="document.getElementById('cmd-bytes').textContent=64"><label for="ek64">64 bytes (512 bit)</label></div>
+      </div>
     </div>
-
-    <div class="output copy-group">
-      <strong>Public Key (OpenSSH) — paste this into GitHub / GitLab / authorized_keys:</strong><br>
-      <div id="rsaPublicOutput">— not generated yet —</div>
-      <button id="copyRsaPublicBtn" class="btn-secondary" disabled>Copy Public Key</button>
+    <div class="field">
+      <span class="label">Encoding</span>
+      <div class="radio-group">
+        <div class="radio-opt"><input type="radio" name="ekfmt" id="ekfmt-hex" value="hex" checked><label for="ekfmt-hex">Hex (openssl default)</label></div>
+        <div class="radio-opt"><input type="radio" name="ekfmt" id="ekfmt-b64" value="base64"><label for="ekfmt-b64">Base64</label></div>
+        <div class="radio-opt"><input type="radio" name="ekfmt" id="ekfmt-b64u" value="base64url"><label for="ekfmt-b64u">Base64url</label></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-gen" onclick="doEnc()">Generate</button>
+      <button class="btn btn-copy" id="copy-enc" disabled onclick="copyField('enc-out','copy-enc')">Copy key</button>
+      <button class="btn btn-copy" id="copy-enc-env" disabled onclick="copyEncEnv()">Copy .env line</button>
+    </div>
+    <div class="output-label">ENCRYPTION_KEY</div>
+    <div class="output-box placeholder" id="enc-out">click generate…</div>
+    <div class="env-line" id="enc-env-preview" style="display:none">
+      <span class="env-key">ENCRYPTION_KEY</span>=<span class="env-val" id="enc-env-val"></span>
+    </div>
+    <div class="meta" id="enc-meta" style="display:none">
+      <span class="badge" id="enc-badge-bits"></span>
+      <span class="badge" id="enc-badge-len"></span>
+      <span class="badge" id="enc-badge-fmt"></span>
     </div>
   </div>
 
-  <div id="error"></div>
+  <!-- RSA -->
+  <div id="tab-rsa" class="panel">
+    <div class="field">
+      <span class="label">Key size</span>
+      <select id="rsa-bits">
+        <option value="2048">2048 bits</option>
+        <option value="3072" selected>3072 bits (recommended)</option>
+        <option value="4096">4096 bits (high security)</option>
+      </select>
+    </div>
+    <p class="warn-text">Private key: PKCS#8 PEM · Public key: OpenSSH (paste into GitHub/GitLab)</p>
+    <div class="btn-row">
+      <button class="btn btn-gen" id="rsa-btn" onclick="doRsa()">Generate key pair</button>
+    </div>
+    <div id="rsa-status" style="margin-top:8px"></div>
+    <div class="rsa-key-block" style="margin-top:1rem">
+      <div class="output-label">Private key (PKCS#8)</div>
+      <div class="output-box placeholder" id="rsa-priv">— not generated yet —</div>
+      <button class="btn btn-copy" id="copy-rsa-priv" disabled onclick="copyField('rsa-priv','copy-rsa-priv')">Copy private</button>
+    </div>
+    <div class="rsa-key-block">
+      <div class="output-label">Public key (OpenSSH)</div>
+      <div class="output-box placeholder" id="rsa-pub">— not generated yet —</div>
+      <button class="btn btn-copy" id="copy-rsa-pub" disabled onclick="copyField('rsa-pub','copy-rsa-pub')">Copy public</button>
+    </div>
+  </div>
+</div>
 
 <script>
-// ────────────────────────────────────────────────
-//  State & wordlist
-// ────────────────────────────────────────────────
-let WORDS = [];
-let wordlistLoaded = false;
+const WORDS=["alpha","brave","cabin","dance","eager","fable","grace","haven","ivory","joker","karma","lemon","maple","noble","ocean","pearl","quest","rider","solar","tiger","ultra","vapor","water","xenon","yacht","zonal","amber","blaze","cedar","delta","ember","flock","globe","hinge","index","jelly","knoll","laser","merge","nerve","onion","pivot","quill","ridge","slope","tower","uncle","vivid","windy","xerox","yield","zebra","acute","bloom","coral","drift","epoch","flute","graze","hover","ideal","jumbo","knife","lunar","mango","navel","olive","pixel","quote","realm","stone","trout","urban","viola","whisp","xylem","yodel","zinc","arena","bench","chalk","depot","earth","field","grant","hedge","inbox","judge","kiwi","lilac","moose","notch","optic","plumb","quota","rover","scout","torch","umbra","vault","waltz","expel","yearn","zesty"];
 
-async function loadWordlist() {
-  try {
-    const res = await fetch('words.json');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    // FIX #3: validate structure, count, and minimum word length
-    if (
-      !Array.isArray(data) ||
-      data.length < 100 ||
-      data.some(w => typeof w !== 'string' || w.length < 3 || !/^[a-z]+$/.test(w))
-    ) {
-      throw new Error('Wordlist failed validation');
-    }
-    WORDS = data;
-    wordlistLoaded = true;
-  } catch {
-    // silent fail – passphrase mode will warn user
-  }
+function rInt(max){const limit=2**32-(2**32%max);let v;do{const a=new Uint32Array(1);crypto.getRandomValues(a);v=a[0];}while(v>=limit);return v%max;}
+function pick(arr){return arr[rInt(arr.length)];}
+function rDigit(){return String(rInt(10));}
+
+function switchTab(t){
+  const ids=['pw','jwt','api','hmac','enc','rsa'];
+  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',ids[i]===t));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
 }
-loadWordlist();
 
-// ────────────────────────────────────────────────
-//  Crypto helpers
-// ────────────────────────────────────────────────
+function updateModeUI(){
+  const mode=document.querySelector('input[name="mode"]:checked').value;
+  document.getElementById('phrase-opts').style.display=mode==='phrase'?'block':'none';
+  document.getElementById('chars-opts').style.display=mode==='chars'?'block':'none';
+  document.getElementById('pin-opts').style.display=mode==='pin'?'block':'none';
+  document.getElementById('hex-opts').style.display=mode==='hexpasswd'?'block':'none';
+  const showStrength=mode==='phrase'||mode==='chars';
+  document.getElementById('sw-fill').parentElement.style.display=showStrength?'block':'none';
+  document.getElementById('sw-text').style.display=showStrength?'block':'none';
+  const showComplexity=mode!=='pin'&&mode!=='hexpasswd';
+  document.querySelector('.field:nth-child(2)').style.display=showComplexity?'block':'none';
+}
+updateModeUI();
 
-// FIX #1: rejection sampling eliminates modulo bias
-function getSecureRandomInt(max) {
-  const limit = 2 ** 32 - (2 ** 32 % max);
-  let value;
-  do {
-    const arr = new Uint32Array(1);
+function doPassword(){
+  const mode=document.querySelector('input[name="mode"]:checked').value;
+  const str=document.querySelector('input[name="strength"]:checked').value;
+  let pwd,meta={};
+
+  if(mode==='phrase'){
+    const count={simple:4,good:5,strong:6,verystrong:6}[str]||5;
+    const sep=document.querySelector('input[name="sep"]:checked').value;
+    const dMode=document.querySelector('input[name="digit"]:checked').value;
+    let words=Array.from({length:count},()=>pick(WORDS));
+    if(str!=='simple')words=words.map(w=>w[0].toUpperCase()+w.slice(1));
+    pwd=sep===''?words.map(w=>w[0].toUpperCase()+w.slice(1)).join(''):words.join(sep);
+    const d=rDigit();
+    if(dMode==='begin'||dMode==='both')pwd=d+pwd;
+    if(dMode==='end'||dMode==='both')pwd+=d;
+    meta={wordCount:count,sep};
+  } else if(mode==='chars'){
+    const len={simple:12,good:16,strong:20,verystrong:24}[str]||16;
+    const cs=document.querySelector('input[name="charset"]:checked').value;
+    let pool;
+    if(cs==='full')pool='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{}|;:,.<>?/~';
+    else if(cs==='alphanum')pool='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    else pool='abcdefghijklmnopqrstuvwxyz0123456789';
+    pwd=Array.from({length:len},()=>pool[rInt(pool.length)]).join('');
+  } else if(mode==='pin'){
+    const len=parseInt(document.querySelector('input[name="pinlen"]:checked').value)||4;
+    pwd=Array.from({length:len},()=>rDigit()).join('');
+  } else {
+    const bytes=parseInt(document.querySelector('input[name="hexlen"]:checked').value)||32;
+    const arr=new Uint8Array(bytes);
     crypto.getRandomValues(arr);
-    value = arr[0];
-  } while (value >= limit);
-  return value % max;
-}
-
-function randomChoice(arr) {
-  return arr[getSecureRandomInt(arr.length)];
-}
-
-function randomDigit() {
-  return String(getSecureRandomInt(10));
-}
-
-function randomChar() {
-  const pool = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{}|;:,.<>?/~";
-  return pool[getSecureRandomInt(pool.length)];
-}
-
-// FIX #5: duplicate derToPem removed — single definition here
-function derToPem(der, label) {
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(der)));
-  let pem = `-----BEGIN ${label}-----\n`;
-  for (let i = 0; i < base64.length; i += 64) {
-    pem += base64.slice(i, i + 64) + "\n";
-  }
-  pem += `-----END ${label}-----`;
-  return pem;
-}
-
-// Converts a CryptoKey (RSA public) to OpenSSH wire format:
-// "ssh-rsa <base64(len+type + len+e + len+n)> generated-key"
-async function toOpenSSHPublicKey(cryptoPublicKey) {
-  const jwk = await crypto.subtle.exportKey("jwk", cryptoPublicKey);
-
-  function b64urlToBytes(s) {
-    const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
-    const bin = atob(b64);
-    return Uint8Array.from(bin, c => c.charCodeAt(0));
+    pwd=Array.from(arr).map(b=>b.toString(16).padStart(2,'0')).join('');
   }
 
-  function sshField(bytes) {
-    const out = new Uint8Array(4 + bytes.length);
-    new DataView(out.buffer).setUint32(0, bytes.length, false);
-    out.set(bytes, 4);
-    return out;
+  const el=document.getElementById('pw-out');
+  el.textContent=pwd;el.classList.remove('placeholder');
+  document.getElementById('copy-pw').disabled=false;
+
+  if(mode==='phrase'||mode==='chars'){
+    showStrength(pwd,meta);
+  } else {
+    document.getElementById('sw-fill').style.width='0%';
+    document.getElementById('sw-text').innerHTML='';
   }
+}
 
-  const keyType = new TextEncoder().encode("ssh-rsa");
-  const exponent = b64urlToBytes(jwk.e);
-  let modulus = b64urlToBytes(jwk.n);
-
-  // OpenSSH requires a leading zero byte on the modulus if the high bit is set
-  // (to signal a positive integer in the SSH mpint encoding)
-  if (modulus[0] & 0x80) {
-    const padded = new Uint8Array(modulus.length + 1);
-    padded.set(modulus, 1);
-    modulus = padded;
+function showStrength(pwd,meta={}){
+  let bits=0;
+  const hasSep=/[\s\-.]/.test(pwd);
+  const hasUpper=/[A-Z]/.test(pwd);
+  const hasDigit=/\d/.test(pwd);
+  const isPhrase=(hasSep&&pwd.split(/[\s\-.]+/).filter(Boolean).length>=3)||(meta.wordCount>=3&&meta.sep==='');
+  if(isPhrase){
+    const parts=meta.wordCount||pwd.split(/[\s\-.]+/).filter(Boolean).length;
+    bits=Math.log2(WORDS.length)*parts;
+    if(hasUpper)bits+=2.5;if(hasDigit)bits+=3.3;
+  } else {
+    let pool=0;
+    if(/[a-z]/.test(pwd))pool+=26;
+    if(/[A-Z]/.test(pwd))pool+=26;
+    if(/[0-9]/.test(pwd))pool+=10;
+    if(/[^A-Za-z0-9]/.test(pwd))pool+=32;
+    bits=Math.log2(pool||1)*pwd.length;
   }
+  const b=Math.round(bits);
+  let label,color,pct,cls;
+  if(b<50){label='Very weak';color='#ff6b6b';pct=12;cls='tag-weak';}
+  else if(b<70){label='Weak';color='#ff8c69';pct=28;cls='tag-weak';}
+  else if(b<90){label='Good';color='var(--warn)';pct=52;cls='tag-ok';}
+  else if(b<110){label='Strong';color='#74c69d';pct=76;cls='tag-good';}
+  else{label='Very strong';color='var(--accent)';pct=100;cls='tag-strong';}
+  document.getElementById('sw-fill').style.width=pct+'%';
+  document.getElementById('sw-fill').style.background=color;
+  document.getElementById('sw-text').innerHTML=`<span class="tag ${cls}">${label}</span><span class="bits-badge">~${b} bits</span>`;
+}
 
-  const parts = [sshField(keyType), sshField(exponent), sshField(modulus)];
-  const total = parts.reduce((s, p) => s + p.length, 0);
-  const blob = new Uint8Array(total);
-  let offset = 0;
-  for (const p of parts) { blob.set(p, offset); offset += p.length; }
+function doJwt(){
+  const len=parseInt(document.getElementById('jwt-len').value)||64;
+  const bytes=new Uint8Array(len/2);
+  crypto.getRandomValues(bytes);
+  const hex=Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('');
+  const el=document.getElementById('jwt-out');
+  el.textContent=hex;el.classList.remove('placeholder');
+  document.getElementById('copy-jwt').disabled=false;
+}
 
+function toggleApiLen(){
+  document.getElementById('api-len').disabled=document.getElementById('api-fmt').value==='uuid';
+}
+
+function doApi(){
+  const fmt=document.getElementById('api-fmt').value;
+  const len=parseInt(document.getElementById('api-len').value)||32;
+  let key;
+  if(fmt==='uuid'){key=crypto.randomUUID();}
+  else{
+    const chars=fmt==='hex'?'0123456789abcdef':'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    key=Array.from({length:len},()=>chars[rInt(chars.length)]).join('');
+  }
+  const el=document.getElementById('api-out');
+  el.textContent=key;el.classList.remove('placeholder');
+  document.getElementById('copy-api').disabled=false;
+}
+
+function doHmac(){
+  const bytes=parseInt(document.getElementById('hmac-bytes').value)||32;
+  const fmt=document.getElementById('hmac-fmt').value;
+  const arr=new Uint8Array(bytes);
+  crypto.getRandomValues(arr);
+  let key;
+  if(fmt==='hex'){key=Array.from(arr).map(b=>b.toString(16).padStart(2,'0')).join('');}
+  else{const b64=btoa(String.fromCharCode(...arr));key=fmt==='base64'?b64:b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+  const el=document.getElementById('hmac-out');
+  el.textContent=key;el.classList.remove('placeholder');
+  document.getElementById('copy-hmac').disabled=false;
+}
+
+function doEnc(){
+  const bytes=parseInt(document.querySelector('input[name="eksize"]:checked').value)||32;
+  const fmt=document.querySelector('input[name="ekfmt"]:checked').value;
+  const arr=new Uint8Array(bytes);
+  crypto.getRandomValues(arr);
+  let key;
+  if(fmt==='hex'){key=Array.from(arr).map(b=>b.toString(16).padStart(2,'0')).join('');}
+  else{const b64=btoa(String.fromCharCode(...arr));key=fmt==='base64'?b64:b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+  const el=document.getElementById('enc-out');
+  el.textContent=key;el.classList.remove('placeholder');
+  document.getElementById('enc-env-val').textContent=key;
+  document.getElementById('enc-env-preview').style.display='block';
+  document.getElementById('enc-badge-bits').textContent=bytes*8+' bit';
+  document.getElementById('enc-badge-len').textContent=key.length+' chars';
+  document.getElementById('enc-badge-fmt').textContent=fmt;
+  document.getElementById('enc-meta').style.display='flex';
+  document.getElementById('copy-enc').disabled=false;
+  document.getElementById('copy-enc-env').disabled=false;
+}
+
+function copyEncEnv(){
+  const t='ENCRYPTION_KEY='+document.getElementById('enc-env-val').textContent.trim();
+  doCopy(t,'copy-enc-env');
+}
+
+function derToPem(der,label){
+  const b64=btoa(String.fromCharCode(...new Uint8Array(der)));
+  let pem=`-----BEGIN ${label}-----\n`;
+  for(let i=0;i<b64.length;i+=64)pem+=b64.slice(i,i+64)+'\n';
+  return pem+`-----END ${label}-----`;
+}
+
+async function toOpenSSH(pubKey){
+  const jwk=await crypto.subtle.exportKey('jwk',pubKey);
+  const d2b=s=>{const b64=s.replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(b64),c=>c.charCodeAt(0));};
+  const field=b=>{const o=new Uint8Array(4+b.length);new DataView(o.buffer).setUint32(0,b.length,false);o.set(b,4);return o;};
+  const kt=new TextEncoder().encode('ssh-rsa');
+  const exp=d2b(jwk.e);
+  let mod=d2b(jwk.n);
+  if(mod[0]&0x80){const p=new Uint8Array(mod.length+1);p.set(mod,1);mod=p;}
+  const parts=[field(kt),field(exp),field(mod)];
+  const total=parts.reduce((s,p)=>s+p.length,0);
+  const blob=new Uint8Array(total);
+  let off=0;for(const p of parts){blob.set(p,off);off+=p.length;}
   return `ssh-rsa ${btoa(String.fromCharCode(...blob))} generated-key`;
 }
 
-// ────────────────────────────────────────────────
-//  Generators
-// ────────────────────────────────────────────────
-function generatePassword() {
-  const mode = document.querySelector('input[name="mode"]:checked')?.value || 'chars';
-  const strength = document.querySelector('input[name="strength"]:checked')?.value || 'good';
-
-  if (mode === 'phrase') {
-    if (!wordlistLoaded || WORDS.length < 10) {
-      return { text: null, error: "Passphrase mode unavailable (wordlist missing) – switch to random characters." };
-    }
-    let count = {simple:4, good:5, strong:6, verystrong:6}[strength] || 5;
-    let capitalize = strength !== 'simple';
-    let sep = document.querySelector('input[name="separator"]:checked')?.value ?? ' ';
-    let digitMode = document.querySelector('input[name="digit"]:checked')?.value ?? 'none';
-
-    let words = Array.from({length: count}, () => randomChoice(WORDS));
-    if (capitalize) words = words.map(w => w.charAt(0).toUpperCase() + w.slice(1));
-
-    let pwd;
-    if (sep === '') {
-      // CamelCase: always capitalise even if strength is simple
-      pwd = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
-    } else {
-      pwd = words.join(sep);
-    }
-
-    const d = randomDigit();
-    if (digitMode === 'begin' || digitMode === 'both') pwd = d + pwd;
-    if (digitMode === 'end'   || digitMode === 'both') pwd += d;
-    return { text: pwd, wordCount: count, sep };
+async function doRsa(){
+  const bits=parseInt(document.getElementById('rsa-bits').value)||3072;
+  const btn=document.getElementById('rsa-btn');
+  const status=document.getElementById('rsa-status');
+  btn.disabled=true;btn.textContent='Generating…';
+  status.innerHTML='<div class="generating-msg"><span class="status-dot"></span>Generating '+bits+'-bit RSA-PSS key pair…</div>';
+  try{
+    const kp=await crypto.subtle.generateKey({name:'RSA-PSS',modulusLength:bits,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
+    const priv=await crypto.subtle.exportKey('pkcs8',kp.privateKey);
+    const privPem=derToPem(priv,'PRIVATE KEY');
+    const pubSsh=await toOpenSSH(kp.publicKey);
+    const pEl=document.getElementById('rsa-priv');pEl.textContent=privPem;pEl.classList.remove('placeholder');
+    const puEl=document.getElementById('rsa-pub');puEl.textContent=pubSsh;puEl.classList.remove('placeholder');
+    document.getElementById('copy-rsa-priv').disabled=false;
+    document.getElementById('copy-rsa-pub').disabled=false;
+    status.innerHTML=`<span class="tag tag-strong">✓ ${bits}-bit RSA-PSS generated</span>`;
+  }catch(e){
+    document.getElementById('rsa-priv').textContent='Error: '+e.message;
+    status.textContent='Generation failed.';
+  }finally{
+    btn.disabled=false;btn.textContent='Generate key pair';
   }
-
-  // chars mode
-  let len = {simple:12, good:16, strong:20, verystrong:24}[strength] || 16;
-  let p = '';
-  for (let i = 0; i < len; i++) p += randomChar();
-  return { text: p };
 }
 
-// FIX #6: estimateStrength now receives generation metadata to handle CamelCase correctly
-function estimateStrength(pwd, meta = {}) {
-  if (!pwd) return "—";
-
-  let bits = 0;
-  const hasSep = /[\s\-.]/.test(pwd);
-  const hasUpper = /[A-Z]/.test(pwd);
-  const hasDigit = /\d/.test(pwd);
-
-  // A passphrase in CamelCase mode has no separator but meta.wordCount tells us
-  const isPassphrase = (hasSep && pwd.split(/[\s\-.]+/).filter(Boolean).length >= 3)
-    || (meta.wordCount >= 3 && meta.sep === '');
-
-  if (isPassphrase && wordlistLoaded) {
-    const parts = meta.wordCount || pwd.split(/[\s\-.]+/).filter(Boolean).length;
-    bits = Math.log2(WORDS.length) * parts;
-    if (hasUpper) bits += 2.5;
-    if (hasDigit) bits += 3.3;
-  } else {
-    let pool = 0;
-    if (/[a-z]/.test(pwd)) pool += 26;
-    if (/[A-Z]/.test(pwd)) pool += 26;
-    if (/[0-9]/.test(pwd)) pool += 10;
-    if (/[^A-Za-z0-9]/.test(pwd)) pool += 32;
-    bits = Math.log2(pool || 1) * pwd.length;
-  }
-
-  // FIX #10: use pw-* classes instead of bare .strong etc. to avoid CSS conflicts
-  let label, cls;
-  if      (bits <  50) { label = "Very weak";   cls = "pw-weak"; }
-  else if (bits <  70) { label = "Weak";         cls = "pw-weak"; }
-  else if (bits <  90) { label = "Good";         cls = "pw-moderate"; }
-  else if (bits < 110) { label = "Strong";       cls = "pw-strong"; }
-  else                 { label = "Very strong";  cls = "pw-verystrong"; }
-
-  return `<span class="${cls}">${label}</span> (~${Math.round(bits)} bits)`;
-}
-
-function generateJwtSecret(length) {
-  const byteLength = length / 2;
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-function generateApiKey(format, length) {
-  if (format === "uuid") return crypto.randomUUID();
-
-  const chars = format === "hex"
-    ? "0123456789abcdef"
-    : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-  let key = "";
-  for (let i = 0; i < length; i++) key += chars[getSecureRandomInt(chars.length)];
-  return key;
-}
-
-function generateHmacKey(byteLength, format) {
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
-
-  if (format === "hex") {
-    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-
-  let bin = String.fromCharCode(...bytes);
-  const b64 = btoa(bin);
-  return format === "base64" ? b64 : b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-}
-
-// FIX #2: switched from RSASSA-PKCS1-v1_5 to RSA-PSS
-async function generateRsaKeyPair(bits = 3072) {
-  const keyPair = await crypto.subtle.generateKey(
-    {
-      name: "RSA-PSS",
-      modulusLength: bits,
-      publicExponent: new Uint8Array([1, 0, 1]),
-      hash: "SHA-256"
-    },
-    true,
-    ["sign", "verify"]
-  );
-
-  const privDer = await crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
-  const privPem = derToPem(privDer, "PRIVATE KEY");
-
-  const sshPub = await toOpenSSHPublicKey(keyPair.publicKey);
-
-  return { privatePem: privPem, publicPem: sshPub };
-}
-
-// ────────────────────────────────────────────────
-//  Copy helper
-// FIX #4 + #11: try/catch on all clipboard calls; flashCopy only fires on success
-// ────────────────────────────────────────────────
-async function copyToClipboard(text, btnId) {
-  try {
+async function doCopy(text,btnId){
+  try{
     await navigator.clipboard.writeText(text);
-    const btn = document.getElementById(btnId);
-    const orig = btn.textContent;
-    btn.textContent = "Copied!";
-    btn.disabled = true;
-    setTimeout(() => {
-      btn.textContent = orig;
-      btn.disabled = false;
-    }, 1400);
-  } catch {
-    alert('Could not access clipboard – please copy the text manually.');
-  }
+    const btn=document.getElementById(btnId);
+    const orig=btn.textContent;
+    btn.textContent='Copied ✓';btn.classList.add('copied');btn.disabled=true;
+    setTimeout(()=>{btn.textContent=orig;btn.classList.remove('copied');btn.disabled=false;},1400);
+  }catch{alert('Copy failed – select manually.');}
 }
 
-// ────────────────────────────────────────────────
-//  Event listeners
-// ────────────────────────────────────────────────
-
-// Password / Passphrase
-document.getElementById('generatePwdBtn').addEventListener('click', () => {
-  const result = generatePassword();
-  // FIX #7: error string no longer passed to estimateStrength
-  if (!result.text) {
-    document.getElementById('pwdOutput').textContent = result.error;
-    document.getElementById('pwdStrength').innerHTML = '—';
-    document.getElementById('copyPwdBtn').disabled = true;
-    return;
-  }
-  document.getElementById('pwdOutput').textContent = result.text;
-  document.getElementById('pwdStrength').innerHTML = estimateStrength(result.text, result);
-  document.getElementById('copyPwdBtn').disabled = false;
-});
-
-document.getElementById('copyPwdBtn').addEventListener('click', async () => {
-  const text = document.getElementById('pwdOutput').textContent.trim();
-  if (text) await copyToClipboard(text, 'copyPwdBtn');
-});
-
-// JWT
-document.getElementById('generateJwtBtn').addEventListener('click', () => {
-  const len = parseInt(document.getElementById('jwtLength').value) || 64;
-  const secret = generateJwtSecret(len);
-  document.getElementById('jwtOutput').textContent = secret;
-  document.getElementById('copyJwtBtn').disabled = false;
-});
-
-document.getElementById('copyJwtBtn').addEventListener('click', async () => {
-  const text = document.getElementById('jwtOutput').textContent.trim();
-  if (text) await copyToClipboard(text, 'copyJwtBtn');
-});
-
-// API Key
-document.getElementById('generateApiBtn').addEventListener('click', () => {
-  const fmt = document.getElementById('apiKeyFormat').value;
-  const len = fmt === 'uuid' ? null : parseInt(document.getElementById('apiKeyLength').value) || 32;
-  const key = generateApiKey(fmt, len);
-  document.getElementById('apiOutput').textContent = key;
-  document.getElementById('copyApiBtn').disabled = false;
-});
-
-document.getElementById('copyApiBtn').addEventListener('click', async () => {
-  const text = document.getElementById('apiOutput').textContent.trim();
-  if (text) await copyToClipboard(text, 'copyApiBtn');
-});
-
-// FIX #8: disable length dropdown when UUID is selected
-document.getElementById('apiKeyFormat').addEventListener('change', function() {
-  document.getElementById('apiKeyLength').disabled = this.value === 'uuid';
-});
-
-// HMAC
-document.getElementById('generateHmacBtn').addEventListener('click', () => {
-  const bytes = parseInt(document.getElementById('hmacByteLength').value) || 32;
-  const fmt = document.getElementById('hmacFormat').value;
-  const key = generateHmacKey(bytes, fmt);
-  document.getElementById('hmacOutput').textContent = key;
-  document.getElementById('copyHmacBtn').disabled = false;
-});
-
-document.getElementById('copyHmacBtn').addEventListener('click', async () => {
-  const text = document.getElementById('hmacOutput').textContent.trim();
-  if (text) await copyToClipboard(text, 'copyHmacBtn');
-});
-
-// RSA — FIX #9: loading state while key is being generated
-document.getElementById('generateRsaBtn').addEventListener('click', async () => {
-  const bits = parseInt(document.getElementById('rsaKeySize').value) || 3072;
-  const btn = document.getElementById('generateRsaBtn');
-  const status = document.getElementById('rsaStatus');
-
-  btn.disabled = true;
-  btn.textContent = 'Generating…';
-  status.textContent = `Generating ${bits}-bit RSA key pair, please wait…`;
-
-  try {
-    const keys = await generateRsaKeyPair(bits);
-    document.getElementById('rsaPrivateOutput').textContent = keys.privatePem;
-    document.getElementById('rsaPublicOutput').textContent = keys.publicPem;
-    document.getElementById('copyRsaPrivateBtn').disabled = false;
-    document.getElementById('copyRsaPublicBtn').disabled = false;
-    status.textContent = `${bits}-bit RSA-PSS key pair generated.`;
-  } catch (err) {
-    document.getElementById('rsaPrivateOutput').textContent = `Error: ${err.message}`;
-    document.getElementById('rsaPublicOutput').textContent = '';
-    status.textContent = '';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Generate RSA Key Pair';
-  }
-});
-
-document.getElementById('copyRsaPrivateBtn').addEventListener('click', async () => {
-  const text = document.getElementById('rsaPrivateOutput').textContent.trim();
-  if (text && !text.startsWith('Error')) await copyToClipboard(text, 'copyRsaPrivateBtn');
-});
-
-document.getElementById('copyRsaPublicBtn').addEventListener('click', async () => {
-  const text = document.getElementById('rsaPublicOutput').textContent.trim();
-  if (text && !text.startsWith('Error')) await copyToClipboard(text, 'copyRsaPublicBtn');
-});
-
-// Passphrase options visibility
-function updatePhraseVisibility() {
-  const isPhrase = document.querySelector('input[name="mode"]:checked')?.value === 'phrase';
-  document.getElementById('phrase-options').style.display = isPhrase ? 'block' : 'none';
+function copyField(outId,btnId){
+  const t=document.getElementById(outId).textContent.trim();
+  if(!t||t.startsWith('click')||t.startsWith('—'))return;
+  doCopy(t,btnId);
 }
-document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', updatePhraseVisibility));
-updatePhraseVisibility();
 </script>
-
-</body>
-</html>
